@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package command;
+
+option go_package = "iscsi-command/";
+
+// gRPC service definition
+service CommandExecutor {
+    rpc Execute (CommandRequest) returns (CommandResponse);
+}
+
+// Request message for executing iscsi-ls
+message CommandRequest {
+    string command = 1;         // The command to execute (must be "iscsi-ls")
+    string portal = 2;          // The iSCSI portal (e.g., IP or hostname)
+    string initiatorName = 3;   // The iSCSI initiator name
+    string targetIQN = 4;       // The target IQN to query
+    string authLogin = 5;       // Optional authentication username
+    string authPassword = 6;    // Optional authentication password
+}
+
+// Response message containing command output and discovered LUNs
+message CommandResponse {
+    string output = 1;          // Raw command output (for debugging)
+    string error = 2;           // Error message, if any
+    repeated LUNInfo luns = 3;  // List of discovered LUNs
+}
+
+// Represents a single iSCSI LUN
+message LUNInfo {
+    int32 lunID = 1;            // Logical Unit Number (LUN)
+    string size = 2;            // LUN size (e.g., "10GiB")
+    string vendor = 3;          // Vendor name
+    string product = 4;         // Product name
+    string serial = 5;          // Serial number of the LUN
+}
