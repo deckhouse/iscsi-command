@@ -18,14 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG TARGETPLATFORM
 RUN echo "Building for $TARGETPLATFORM"
 
-# Установить правильную архитектуру в зависимости от платформы
+# Set the correct architecture depending on the platform
 RUN case "$TARGETPLATFORM" in \
         "linux/amd64")  export GOARCH=amd64 ;; \
         "linux/arm64")  export GOARCH=arm64 ;; \
         *) echo "Unsupported architecture: $TARGETPLATFORM" && exit 1 ;; \
     esac
 
-# Пересобрать libiscsi под ARM64/AMD64
+#Rebuild libiscsi for ARM64/AMD64
 RUN rm -rf libiscsi && git clone --depth 1 https://github.com/deckhouse/libiscsi.git && \
     cd libiscsi && ./autogen.sh && ./configure && make -j$(nproc) && \
     cp utils/iscsi-ls /usr/local/bin/ && chmod +x /usr/local/bin/iscsi-ls
