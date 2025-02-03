@@ -4,7 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"github.com/deckhouse/iscsi-command/internal/logger"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/deckhouse/iscsi-command/config"
@@ -16,6 +17,11 @@ import (
 const defaultConfigPath = "config.yaml"
 
 func main() {
+	logger.Init()
+	log := logger.Log
+
+	log.Info("Starting client...")
+
 	// Command-line flags
 	configFile := flag.String("config", defaultConfigPath, "Path to configuration file")
 	flag.Parse()
@@ -23,17 +29,17 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.WithError(err).Fatal("Failed to load configuration")
 	}
 
 	// Validate socket path
 	if cfg.SocketPath == "" {
-		log.Fatalf("Unix socket path is required in config.yaml")
+		log.Fatal("Unix socket path is required in config.yaml")
 	}
 
 	// Connect via Unix socket
 	socketAddress := fmt.Sprintf("unix://%s", cfg.SocketPath)
-	log.Printf("Connecting via Unix socket: %s", cfg.SocketPath)
+	log.WithField("socketPath", cfg.SocketPath).Info("Connecting via Unix socket")
 
 	conn, err := grpc.Dial(
 		socketAddress,
@@ -41,7 +47,7 @@ func main() {
 		grpc.WithBlock(), // Wait until connection is established
 	)
 	if err != nil {
-		log.Fatalf("Failed to connect to gRPC server: %v", err)
+		log.WithError(err).Fatal("Failed to connect to gRPC server")
 	}
 	defer conn.Close()
 
@@ -62,22 +68,27 @@ func main() {
 	defer cancel()
 
 	// Execute gRPC request
-	log.Println("Sending request to gRPC server...")
+	log.Info("Sending request to gRPC server...")
 	resp, err := client.Execute(ctx, req)
 	if err != nil {
-		log.Fatalf("Error while calling Execute: %v", err)
+		log.WithError(err).Fatal("Error while calling Execute")
 	}
 
 	// Handle response
-	log.Println("Received response from server.")
-	log.Printf("Raw Output: %s", resp.Output)
+	log.Info("Received response from server.")
+	log.WithField("rawOutput", resp.Output).Info("Command output received")
 	if resp.Error != "" {
-		log.Printf("Server Error: %s", resp.Error)
+		log.WithField("serverError", resp.Error).Warn("Server returned an error")
 	} else {
-		log.Println("Discovered LUNs:")
+		log.Info("Discovered LUNs:")
 		for _, lun := range resp.Luns {
-			log.Printf("LUN ID: %d, Size: %s, Vendor: %s, Product: %s, Serial: %s",
-				lun.LunID, lun.Size, lun.Vendor, lun.Product, lun.Serial)
+			log.WithFields(logrus.Fields{
+				"LUN ID":  lun.LunID,
+				"Size":    lun.Size,
+				"Vendor":  lun.Vendor,
+				"Product": lun.Product,
+				"Serial":  lun.Serial,
+			}).Info("LUN details")
 		}
 	}
 }

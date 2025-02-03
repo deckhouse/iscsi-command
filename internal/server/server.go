@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os/exec"
 
+	"github.com/deckhouse/iscsi-command/internal/logger"
 	pb "github.com/deckhouse/iscsi-command/pkg/iscsi-command"
 )
 
@@ -17,11 +17,17 @@ type Server struct {
 
 // Execute processes gRPC requests and executes iscsi-ls
 func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.CommandResponse, error) {
-	log.Printf("Received Execute request: Command=%s, Portal=%s, Initiator=%s, TargetIQN=%s",
-		req.Command, req.Portal, req.InitiatorName, req.TargetIQN)
+	log := logger.Log.WithFields(map[string]interface{}{
+		"command":       req.Command,
+		"portal":        req.Portal,
+		"initiatorName": req.InitiatorName,
+		"targetIQN":     req.TargetIQN,
+	})
+
+	log.Info("Received Execute request")
 
 	if req.Command != "iscsi-ls" {
-		log.Printf("Unsupported command: %s", req.Command)
+		log.Warn("Unsupported command received")
 		return &pb.CommandResponse{Error: "Unsupported command"}, nil
 	}
 
@@ -35,26 +41,27 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 
 	// Execute iscsi-ls with parameters
 	cmdStr := fmt.Sprintf("iscsi-ls %s -i %s -s -T %s", targetURL, req.InitiatorName, req.TargetIQN)
-	log.Printf("Executing command: %s", cmdStr)
+	log = log.WithField("cmd", cmdStr)
+	log.Info("Executing command")
 
 	cmd := exec.Command("iscsi-ls", targetURL, "-i", req.InitiatorName, "-s", "-T", req.TargetIQN)
 	output, err := cmd.CombinedOutput()
 
 	// Handle context cancellation
 	if ctx.Err() == context.Canceled {
-		log.Println("Request canceled by client")
+		log.Warn("Request canceled by client")
 		return nil, fmt.Errorf("command canceled: %w", ctx.Err())
 	}
 	if ctx.Err() == context.DeadlineExceeded {
-		log.Println("Request timed out")
+		log.Warn("Request timed out")
 		return nil, fmt.Errorf("command timed out: %w", ctx.Err())
 	}
 	if err != nil {
-		log.Printf("Command failed: %s: %v", cmdStr, err)
+		log.WithError(err).Error("Command execution failed")
 		return &pb.CommandResponse{Error: fmt.Sprintf("failed to run iscsi-ls: %s: %v", cmdStr, err)}, nil
 	}
 
-	log.Println("Command executed successfully, parsing output")
+	log.Info("Command executed successfully, parsing output")
 
 	// Parse the JSON output
 	var targetsRaw []struct {
@@ -69,14 +76,14 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 		} `json:"LUNs"`
 	}
 	if err := json.Unmarshal(output, &targetsRaw); err != nil {
-		log.Printf("Failed to parse iscsi-ls output: %v", err)
+		log.WithError(err).WithField("output", string(output)).Error("Failed to parse iscsi-ls output")
 		return nil, fmt.Errorf("failed to parse iscsi-ls output: %w", err)
 	}
 
 	// Return LUNs for the specified target IQN
 	for _, targetRaw := range targetsRaw {
 		if targetRaw.Target == req.TargetIQN {
-			log.Printf("Found matching target: %s", targetRaw.Target)
+			log.Info("Found matching target")
 
 			// Convert targetRaw.LUNs to []*pb.LUNInfo
 			var luns []*pb.LUNInfo
@@ -90,7 +97,7 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 				})
 			}
 
-			log.Printf("Returning %d LUNs for target %s", len(luns), req.TargetIQN)
+			log.WithField("lun_count", len(luns)).Info("Returning LUNs")
 			return &pb.CommandResponse{
 				Output: string(output),
 				Luns:   luns,
@@ -98,6 +105,14 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 		}
 	}
 
-	log.Printf("No LUNs found for target %s", req.TargetIQN)
+	log.Warn("No matching LUNs found for target")
 	return nil, fmt.Errorf("no LUNs found for target %s", req.TargetIQN)
+}
+
+// Ping responds with the status of the service
+func (s *Server) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
+	logger.Log.Info("Received Ping request")
+	return &pb.PingResponse{
+		Status: "Service is running",
+	}, nil
 }

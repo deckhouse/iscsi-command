@@ -2,8 +2,8 @@ package interceptor
 
 import (
 	"context"
-	"log"
 
+	"github.com/deckhouse/iscsi-command/internal/logger"
 	"google.golang.org/grpc"
 )
 
@@ -14,6 +14,18 @@ func LoggingInterceptor(
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (interface{}, error) {
-	log.Printf("Received request: %s", info.FullMethod)
-	return handler(ctx, req)
+	log := logger.Log.WithField("method", info.FullMethod)
+
+	log.Info("Received gRPC request")
+
+	// Call the handler to process the request
+	resp, err := handler(ctx, req)
+
+	if err != nil {
+		log.WithError(err).Error("Request processing failed")
+	} else {
+		log.Info("Request processed successfully")
+	}
+
+	return resp, err
 }

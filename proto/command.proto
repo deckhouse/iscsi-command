@@ -7,6 +7,7 @@ option go_package = "iscsi-command/";
 // gRPC service definition
 service CommandExecutor {
     rpc Execute (CommandRequest) returns (CommandResponse);
+    rpc Ping (PingRequest) returns (PingResponse); // New Ping method
 }
 
 // Request message for executing iscsi-ls
@@ -33,4 +34,12 @@ message LUNInfo {
     string vendor = 3;          // Vendor name
     string product = 4;         // Product name
     string serial = 5;          // Serial number of the LUN
+}
+
+// Request message for Ping
+message PingRequest {}
+
+// Response message for Ping
+message PingResponse {
+    string status = 1; // Status message (e.g., "Service is running")
 }

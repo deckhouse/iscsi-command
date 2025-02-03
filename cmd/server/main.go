@@ -2,20 +2,25 @@ package main
 
 import (
 	"flag"
-	"log"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/deckhouse/iscsi-command/config"
 	"github.com/deckhouse/iscsi-command/internal/interceptor"
+	"github.com/deckhouse/iscsi-command/internal/logger"
 	"github.com/deckhouse/iscsi-command/internal/server"
 	pb "github.com/deckhouse/iscsi-command/pkg/iscsi-command"
 	"google.golang.org/grpc"
+	"net"
 )
 
 func main() {
+	logger.Init()
+	log := logger.Log
+
+	log.Info("Starting gRPC server...")
+
 	// Command-line parameter for config file
 	configFile := flag.String("config", "config.yaml", "Path to configuration file")
 	flag.Parse()
@@ -23,30 +28,30 @@ func main() {
 	// Load configuration from file
 	cfg, err := config.LoadConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.WithError(err).Fatal("Failed to load configuration")
 	}
 
 	// Validate socket path
 	if cfg.SocketPath == "" {
-		log.Fatalf("Unix socket path is required in config.yaml")
+		log.Fatal("Unix socket path is required in config.yaml")
 	}
 
 	// Remove existing socket (if any)
 	if err := os.RemoveAll(cfg.SocketPath); err != nil {
-		log.Fatalf("Failed to remove existing socket: %v", err)
+		log.WithError(err).Fatal("Failed to remove existing socket")
 	}
 
 	// Create Unix socket listener
 	lis, err := net.Listen("unix", cfg.SocketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen on Unix socket %s: %v", cfg.SocketPath, err)
+		log.WithError(err).Fatalf("Failed to listen on Unix socket %s", cfg.SocketPath)
 	}
 
 	if err := os.Chmod(cfg.SocketPath, 0777); err != nil {
-		log.Fatalf("Failed to set permissions on Unix socket: %v", err)
+		log.WithError(err).Fatalf("Failed to set permissions on Unix socket %s", cfg.SocketPath)
 	}
 
-	log.Printf("Server is running on Unix socket %s", cfg.SocketPath)
+	log.WithField("socketPath", cfg.SocketPath).Info("Server is running on Unix socket")
 
 	// Create gRPC server with logging interceptor
 	grpcServer := grpc.NewServer(
@@ -61,15 +66,15 @@ func main() {
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Println("gRPC server started on Unix socket")
+		log.Info("gRPC server started on Unix socket")
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
+			log.WithError(err).Fatal("Failed to serve gRPC server")
 		}
 	}()
 
 	// Wait for termination signal
 	<-stopChan
-	log.Println("Shutting down gracefully...")
+	log.Info("Shutting down gracefully...")
 	grpcServer.GracefulStop()
-	log.Println("Server stopped")
+	log.Info("Server stopped")
 }

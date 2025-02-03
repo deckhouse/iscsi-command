@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	CommandExecutor_Execute_FullMethodName = "/command.CommandExecutor/Execute"
+	CommandExecutor_Ping_FullMethodName    = "/command.CommandExecutor/Ping"
 )
 
 // CommandExecutorClient is the client API for CommandExecutor service.
@@ -29,6 +30,7 @@ const (
 // gRPC service definition
 type CommandExecutorClient interface {
 	Execute(ctx context.Context, in *CommandRequest, opts ...grpc.CallOption) (*CommandResponse, error)
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
 type commandExecutorClient struct {
@@ -49,6 +51,16 @@ func (c *commandExecutorClient) Execute(ctx context.Context, in *CommandRequest,
 	return out, nil
 }
 
+func (c *commandExecutorClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, CommandExecutor_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandExecutorServer is the server API for CommandExecutor service.
 // All implementations must embed UnimplementedCommandExecutorServer
 // for forward compatibility.
@@ -56,6 +68,7 @@ func (c *commandExecutorClient) Execute(ctx context.Context, in *CommandRequest,
 // gRPC service definition
 type CommandExecutorServer interface {
 	Execute(context.Context, *CommandRequest) (*CommandResponse, error)
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	mustEmbedUnimplementedCommandExecutorServer()
 }
 
@@ -68,6 +81,9 @@ type UnimplementedCommandExecutorServer struct{}
 
 func (UnimplementedCommandExecutorServer) Execute(context.Context, *CommandRequest) (*CommandResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Execute not implemented")
+}
+func (UnimplementedCommandExecutorServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedCommandExecutorServer) mustEmbedUnimplementedCommandExecutorServer() {}
 func (UnimplementedCommandExecutorServer) testEmbeddedByValue()                         {}
@@ -108,6 +124,24 @@ func _CommandExecutor_Execute_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandExecutor_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandExecutorServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandExecutor_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandExecutorServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandExecutor_ServiceDesc is the grpc.ServiceDesc for CommandExecutor service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -118,6 +152,10 @@ var CommandExecutor_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Execute",
 			Handler:    _CommandExecutor_Execute_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _CommandExecutor_Ping_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
