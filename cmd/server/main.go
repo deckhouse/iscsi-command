@@ -15,25 +15,29 @@ import (
 	"net"
 )
 
+const defaultSocketPath = "/csi/iscsi.sock"
+
 func main() {
 	logger.Init()
 	log := logger.Log
 
 	log.Info("Starting gRPC server...")
 
-	// Command-line parameter for config file
+	// Command-line parameter for config file (default: config.yaml)
 	configFile := flag.String("config", "config.yaml", "Path to configuration file")
 	flag.Parse()
 
 	// Load configuration from file
 	cfg, err := config.LoadConfig(*configFile)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to load configuration")
+		log.WithError(err).Warn("Failed to load configuration, using defaults")
+		cfg = &config.Config{}
 	}
 
-	// Validate socket path
+	// Validate or set default socket path
 	if cfg.SocketPath == "" {
-		log.Fatal("Unix socket path is required in config.yaml")
+		cfg.SocketPath = defaultSocketPath
+		log.WithField("socketPath", cfg.SocketPath).Warn("Using default Unix socket path")
 	}
 
 	// Remove existing socket (if any)
