@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/deckhouse/iscsi-command/internal/entity"
 	"os/exec"
 
 	"github.com/deckhouse/iscsi-command/internal/logger"
@@ -65,15 +66,9 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 
 	// Parse the JSON output
 	var targetsRaw []struct {
-		Target  string     `json:"Target"`
-		Portals []string   `json:"Portals"`
-		LUNs    []struct { // Temporary struct for parsing
-			LunID   int32  `json:"LunID"`
-			Size    string `json:"Size"`
-			Vendor  string `json:"Vendor"`
-			Product string `json:"Product"`
-			Serial  string `json:"Serial"`
-		} `json:"LUNs"`
+		Target  string           `json:"Target"`
+		Portals []string         `json:"Portals"`
+		LUNs    []entity.LUNInfo `json:"LUNs"`
 	}
 	if err := json.Unmarshal(output, &targetsRaw); err != nil {
 		log.WithError(err).WithField("output", string(output)).Error("Failed to parse iscsi-ls output")
@@ -89,11 +84,10 @@ func (s *Server) Execute(ctx context.Context, req *pb.CommandRequest) (*pb.Comma
 			var luns []*pb.LUNInfo
 			for _, lun := range targetRaw.LUNs {
 				luns = append(luns, &pb.LUNInfo{
-					LunID:   lun.LunID,
-					Size:    lun.Size,
-					Vendor:  lun.Vendor,
-					Product: lun.Product,
-					Serial:  lun.Serial,
+					Lun:    lun.LUN,
+					Wwid:   lun.WWID,
+					Size:   lun.Size,
+					Errors: lun.Errors,
 				})
 			}
 

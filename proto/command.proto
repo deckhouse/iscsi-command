@@ -7,7 +7,7 @@ option go_package = "iscsi-command/";
 // gRPC service definition
 service CommandExecutor {
     rpc Execute (CommandRequest) returns (CommandResponse);
-    rpc Ping (PingRequest) returns (PingResponse); // New Ping method
+    rpc Ping (PingRequest) returns (PingResponse); // Ping method for health checks
 }
 
 // Request message for executing iscsi-ls
@@ -29,11 +29,10 @@ message CommandResponse {
 
 // Represents a single iSCSI LUN
 message LUNInfo {
-    int32 lunID = 1;            // Logical Unit Number (LUN)
-    string size = 2;            // LUN size (e.g., "10GiB")
-    string vendor = 3;          // Vendor name
-    string product = 4;         // Product name
-    string serial = 5;          // Serial number of the LUN
+    uint32 lun = 1;             // Logical Unit Number (LUN)
+    string wwid = 2;            // World Wide Name (identifier)
+    uint64 size = 3;            // Size of the LUN in bytes
+    string errors = 4;          // Error message related to the LUN, if any
 }
 
 // Request message for Ping
